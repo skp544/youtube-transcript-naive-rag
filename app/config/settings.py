@@ -31,9 +31,9 @@ class Settings(BaseSettings):
 
     #API
     api_host: str = "0.0.0.0"
-    api_port: str = 8080
+    api_port: str = "8080"
     log_level: str = "INFO"
-    app_name="YoutubeTranscriptNaiveRag"
+    app_name: str = "YoutubeTranscriptNaiveRag"
 
     #upload limits 
     max_files_per_upload: int = 10
@@ -41,6 +41,9 @@ class Settings(BaseSettings):
 
     # ingestion mode
     use_temporal_ingestion: bool = False
+
+    # evaluation
+    enable_ragas_evaluation: bool = False
 
 
 def get_settings() -> Settings:
