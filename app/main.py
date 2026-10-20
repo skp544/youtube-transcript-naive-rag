@@ -1,6 +1,15 @@
 from fastapi import FastAPI
+from app.config.settings import get_settings
+from dotenv import load_dotenv
 
-app = FastAPI()
+load_dotenv()
+
+
+settings = get_settings()
+
+app = FastAPI(
+    title=settings.app_name
+)
 
 
 @app.get("/")
