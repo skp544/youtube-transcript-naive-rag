@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from app.config.settings import get_settings
 from dotenv import load_dotenv
-from controllers import health_controller
+from controllers import document_controller, health_controller
 
 load_dotenv()
 
@@ -18,6 +18,7 @@ def hello() -> dict[str, str]:
     return {"message": "Hello, World!"}
 
 app.include_router(health_controller.router)
+app.include_router(document_controller.router)
 
 
 def main() -> None:

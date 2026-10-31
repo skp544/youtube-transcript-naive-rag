@@ -70,7 +70,7 @@ class IngestionService:
         for path in paths:
             results.append(self.ingest_file_at_path(path))
 
-        total_chunks = sum(result["chunk_created"] for result in results)
+        total_chunks = sum(result["chunks_created"] for result in results)
 
         return {
             "chunks_created": total_chunks,
