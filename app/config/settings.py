@@ -47,6 +47,8 @@ class Settings(BaseSettings):
     # evaluation
     enable_ragas_evaluation: bool = False
 
+    upload_dir : str = "uploads"
+
 @lru_cache
 def get_settings() -> Settings:
     """Get the settings for the application"""
