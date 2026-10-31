@@ -46,6 +46,8 @@ async def upload_documents(
                 detail="File is empty. Please provide a non-empty file.",
             )
 
+        file_pairs.append((file.filename, content))
+
     try:
         payload = ingestion_service.ingest_file_sync(file_pairs)
     except ValueError as e:
