@@ -41,7 +41,7 @@ class DocumentService:
             return self.TRANSCRIPT_CSV_FILENAMES.issubset(fields)
 
 
-    def load_transcript_csv(self, file_path: Path, source_name=str) -> list[Document]:
+    def load_transcript_csv(self, file_path: Path, source_name: str | None= None) -> list[Document]:
         """Load transcript CSV file into a list of documents"""
 
 
@@ -74,9 +74,35 @@ class DocumentService:
         return documents
 
 
+    def load_file(self, file_path: Path, source_name: str | None=None) -> list[Document]:
+        file_path = Path(file_path)
+
+        source = source_name or file_path.name
+
+        ext = file_path.suffix.lower()
+
+        if ext not in self.SUPPORTED_FILE_EXTENSIONS:
+            raise ValueError("Unsupported file extension")
+
+
+        if ext == ".csv":
+            if self._is_transcript_csv(file_path):
+                docs = self.load_transcript_csv(file_path, source)
+            else:
+                raise ValueError(f"Unsupported CSV file: {file_path}")
+
+
+        else:
+            raise ValueError(f"Unsupported file extension: {ext}")
+
+        return docs
 
     def split_documents(self, documents: list[Document]) -> list[Document]:
         """Split the documents"""
 
         return self.text_splitter.split_documents(documents)
 
+    def process_file(self, file_path: Path, source_name: str | None=None) -> list[Document]:
+        documents = self.load_file(file_path, source_name)
+
+        return self.split_documents(documents)
