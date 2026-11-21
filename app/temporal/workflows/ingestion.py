@@ -4,14 +4,8 @@ from typing import Any
 
 from temporalio import workflow
 
-DEFAULT_INDEX_BATCH_SIZE = 100  # Ideally loaded from your env vars
-
 with workflow.unsafe.imports_passed_through():
-    from app.temporal.activities.ingestion import (
-        parse_document_activity,
-        index_document_activity,
-        chunk_documents_activity,
-    )
+    from app.temporal.activities.ingestion import ingest_file_activity
 
 
 @dataclass
@@ -40,46 +34,28 @@ class BatchIngestionWorkflow:
     def get_progress(self) -> BatchIngestProgress:
         return self.progress
 
+    @workflow.run
     async def run(self, files: list[FileIngestInput]) -> BatchIngestProgress:
         """Workflow to ingest a batch of files into the new vector store"""
 
-        batch_size = DEFAULT_INDEX_BATCH_SIZE
         self.progress.files_total = len(files)
         self.progress.status = "RUNNING"
 
         for file_input in files:
             self.progress.current_filename = file_input.filename
 
-            doc_dicts = await workflow.execute_activity(
-                parse_document_activity,
+            result = await workflow.execute_activity(
+                ingest_file_activity,
                 args=[file_input.local_path, file_input.filename],
-                start_to_close_timeout=timedelta(minutes=30),
+                start_to_close_timeout=timedelta(hours=2),
+                heartbeat_timeout=timedelta(minutes=5),
             )
-
-            chunk_dicts = await workflow.execute_activity(
-                chunk_documents_activity,
-                args=[doc_dicts],
-                start_to_close_timeout=timedelta(minutes=30),
-            )
-
-            indexed = 0
-
-            for start in range(0, len(chunk_dicts), batch_size):
-                batch = chunk_dicts[start : start + batch_size]
-                count = await workflow.execute_activity(
-                    index_document_activity,
-                    args=[batch],
-                    start_to_close_timeout=timedelta(minutes=30),
-                    heartbeat_timeout=timedelta(minutes=5),
-                )
-
-                indexed += count
 
             self.progress.files_completed += 1
             self.progress.file_results.append(
                 {
-                    "filename": file_input.filename,
-                    "chunks_created": indexed,
+                    "filename": result["filename"],
+                    "chunks_created": result["chunks_created"],
                     "document_ids": [],
                 }
             )

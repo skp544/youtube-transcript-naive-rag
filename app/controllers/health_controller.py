@@ -1,5 +1,5 @@
 from datetime import datetime
-from schemas.api import HealthResponse
+from app.schemas.api import HealthResponse
 from fastapi import APIRouter
 
 router = APIRouter(
