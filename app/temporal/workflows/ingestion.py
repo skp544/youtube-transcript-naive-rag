@@ -7,6 +7,8 @@ from temporalio import workflow
 with workflow.unsafe.imports_passed_through():
     from app.temporal.activities.ingestion import ingest_file_activity
 
+DEFAULT_INDEX_BATCH_SIZE = 100
+
 
 @dataclass
 class FileIngestInput:
@@ -40,22 +42,30 @@ class BatchIngestionWorkflow:
 
         self.progress.files_total = len(files)
         self.progress.status = "RUNNING"
+        batch_size = DEFAULT_INDEX_BATCH_SIZE
 
         for file_input in files:
             self.progress.current_filename = file_input.filename
 
-            result = await workflow.execute_activity(
+            indexed = await workflow.execute_activity(
                 ingest_file_activity,
-                args=[file_input.local_path, file_input.filename],
-                start_to_close_timeout=timedelta(hours=2),
+                args=[file_input.local_path, file_input.filename, batch_size],
+                start_to_close_timeout=timedelta(minutes=60),
                 heartbeat_timeout=timedelta(minutes=5),
             )
+
+            # result = await workflow.execute_activity(
+            #     ingest_file_activity,
+            #     args=[file_input.local_path, file_input.filename],
+            #     start_to_close_timeout=timedelta(hours=2),
+            #     heartbeat_timeout=timedelta(minutes=5),
+            # )
 
             self.progress.files_completed += 1
             self.progress.file_results.append(
                 {
-                    "filename": result["filename"],
-                    "chunks_created": result["chunks_created"],
+                    "filename": file_input.filename,
+                    "chunks_created": indexed,
                     "document_ids": [],
                 }
             )

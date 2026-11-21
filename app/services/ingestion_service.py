@@ -1,3 +1,5 @@
+from typing import Callable
+
 from app.config.settings import get_settings
 from app.repositories.vector_store_repository import VectorStoreRepository
 from app.services.document_service import DocumentService
@@ -17,20 +19,20 @@ class IngestionService:
         self.document_service = DocumentService()
         self.vector_store_repository = VectorStoreRepository()
 
-
-    def save_upload_batch(self, file_pairs: list[tuple[str, bytes]]) -> tuple[str, list[Path]]:
-
+    def save_upload_batch(
+        self, file_pairs: list[tuple[str, bytes]]
+    ) -> tuple[str, list[Path]]:
         """Save a batch of file to the upload directory"""
 
         batch_id = str(uuid.uuid4())
 
-        batch_dir = Path(self.settings.upload_dir)  / batch_id
+        batch_dir = Path(self.settings.upload_dir) / batch_id
 
         batch_dir.mkdir(parents=True, exist_ok=True)
 
         paths: list[Path] = []
 
-        for filename , content in file_pairs:
+        for filename, content in file_pairs:
             safe_name = Path(filename).name
             dest = batch_dir / safe_name
 
@@ -39,27 +41,43 @@ class IngestionService:
 
             logger.info(f"Saved {filename} to {dest}")
 
-
         return batch_id, paths
 
+    def ingest_file_at_path(
+        self,
+        file_path: Path,
+        source_name: str | None = None,
+        *,
+        index_batch_size: int | None = None,
+        on_index_batch: Callable[[int, int], None] | None = None,
+    ) -> dict:
 
-
-    def ingest_file_at_path(self, file_path: Path, source_name: str | None= None) -> dict:
-
-        name  = source_name or file_path.name
+        name = source_name or file_path.name
 
         chunks = self.document_service.process_file(file_path, source_name=name)
 
         if not chunks:
-            return {"filename": name, "chunks_created" : 0, "document_ids" : []}
+            return {"filename": name, "chunks_created": 0, "document_ids": []}
 
-        ids = self.vector_store_repository.add_documents(chunks)
+        # ids = self.vector_store_repository.add_documents(chunks)
 
-        return {
-            "filename" : name, "chunks_created" : len(chunks), "document_ids" : ids
-        }
+        # return {"filename": name, "chunks_created": len(chunks), "document_ids": ids}
 
+        batch_size = index_batch_size or self.settings.index_batch_size
 
+        ids: list[str] = []
+
+        for start in range(0, len(chunks), batch_size):
+            batch = chunks[start : start + batch_size]  # take the next batch size
+
+            ids.extend(self.vector_store_repository.add_documents(batch))
+
+            # todo: send heartbeats to temporal
+
+            if on_index_batch:
+                on_index_batch(min(start + len(batch), len(chunks)), len(chunks))
+
+        return {"filename": name, "chunks_created": len(chunks), "document_ids": ids}
 
     def ingest_file_sync(self, file_pairs: list[tuple[str, bytes]]) -> dict:
 
@@ -74,7 +92,7 @@ class IngestionService:
 
         return {
             "chunks_created": total_chunks,
-            "files" : results,
-            "files_total" : len(results),
-            "message" : "Documents Uploaded and indexed successfully"
+            "files": results,
+            "files_total": len(results),
+            "message": "Documents Uploaded and indexed successfully",
         }

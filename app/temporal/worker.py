@@ -5,7 +5,12 @@ from app.temporal.client import get_temporal_client
 from app.temporal.workflows.ingestion import BatchIngestionWorkflow
 from app.utils.logger import get_logger
 from temporalio.worker import Worker
-from app.temporal.activities.ingestion import ingest_file_activity
+from app.temporal.activities.ingestion import (
+    chunk_documents_activity,
+    index_document_activity,
+    parse_document_activity,
+    ingest_file_activity,
+)
 
 logger = get_logger(__name__)
 
@@ -19,7 +24,12 @@ async def main() -> None:
         client=client,
         task_queue=settings.temporal_task_queue,
         workflows=[BatchIngestionWorkflow],
-        activities=[ingest_file_activity],
+        activities=[
+            chunk_documents_activity,
+            index_document_activity,
+            parse_document_activity,
+            ingest_file_activity,
+        ],
     )
 
     logger.info(
