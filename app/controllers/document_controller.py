@@ -1,9 +1,14 @@
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from app.config.settings import get_settings
-from app.schemas.api import DocumentBatchUploadResponse
+from app.schemas.api import (
+    AsyncIngestionStartedResponse,
+    DocumentBatchUploadResponse,
+    IngestionStatusResponse,
+)
 from app.services.ingestion_service import IngestionService
 from app.utils.logger import get_logger
+from app.utils.temporal_helpers import use_temporal
 
 logger = get_logger(__name__)
 
@@ -48,6 +53,19 @@ async def upload_documents(
 
         file_pairs.append((file.filename, content))
 
+    if use_temporal():
+        from app.services.temporal_ingestion_service import TemporalIngestionService
+
+        temporal_service = TemporalIngestionService()
+
+        try:
+            result = await temporal_service.start_batch_ingestion(file_pairs)
+
+        except Exception as e:
+            logger.error(f"Error starting batch ingestion: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+        return AsyncIngestionStartedResponse(**result)
+
     try:
         payload = ingestion_service.ingest_file_sync(file_pairs)
     except ValueError as e:
@@ -65,3 +83,27 @@ async def upload_documents(
         files_total=payload["files_total"],
         message=payload["message"],
     )
+
+
+@router.get(
+    "/ingestion/{workflow_id}",
+    summary="Get the status of an asynchronous ingestion workflow",
+    response_model=IngestionStatusResponse,
+)
+async def get_status(workflow_id: str) -> IngestionStatusResponse:
+    if not use_temporal():
+        raise HTTPException(
+            status_code=400, detail="Asynchronous ingestion is not enabled"
+        )
+
+    from app.services.temporal_ingestion_service import TemporalIngestionService
+
+    temporal_svc = TemporalIngestionService()
+    try:
+        result = await temporal_svc.get_ingestion_status(workflow_id)
+
+    except Exception as e:
+        logger.error(f"Error getting ingestion service : {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return IngestionStatusResponse(**result)
